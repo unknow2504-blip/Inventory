@@ -86,4 +86,5 @@ def main():
         print("5. จำหน่ายออก/คัดทิ้ง (DISPOSE)")
         print("0. ออกจากโปรแกรม")
         
-        choice =
+        
+
