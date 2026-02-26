@@ -41,53 +41,87 @@ def index():
     
     return render_template_string('''
         <style>
-            body { font-family: sans-serif; max-width: 900px; margin: auto; padding: 20px; background: #f4f7f6; }
-            .nav { margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 20px; }
-            table { width: 100%; border-collapse: collapse; background: white; }
-            th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 1000px; margin: auto; padding: 20px; background: #f0f2f5; }
+            .nav { margin-bottom: 20px; padding: 15px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; gap: 20px; font-weight: bold; }
+            .nav a { text-decoration: none; color: #007bff; }
+            
+            .form-container { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 30px; border-top: 5px solid #28a745; }
+            .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+            
+            table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+            th, td { padding: 15px; border-bottom: 1px solid #eee; text-align: left; }
             th { background: #007bff; color: white; }
-            .btn-add { background: #28a745; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; }
-            input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+            
+            input, select, button { padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+            .btn-save { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+            .btn-search { background: #007bff; color: white; border: none; cursor: pointer; }
         </style>
 
         <div class="nav">
-            <a href="/">🏠 หน้าหลักคลังสินค้า</a>
-            <a href="/history">📜 ดูประวัติการเบิก-รับ</a>
+            <a href="/">🏠 หน้าหลักจัดการคลัง</a>
+            <a href="/history">📜 ดูประวัติการเบิก-รับของ</a>
         </div>
 
-        <h1>📦 ระบบจัดการคลังสินค้า</h1>
-        
-        <form method="get" style="margin-bottom: 20px; display: flex; gap: 10px;">
-            <input name="search" placeholder="ค้นหาชื่ออุปกรณ์..." value="{{ search }}" style="flex-grow: 1;">
-            <button type="submit">🔍 ค้นหา</button>
-        </form>
+        <h1>📦 ระบบบริหารจัดการคลังสินค้า</h1>
 
-        <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h3>➕ เพิ่มอุปกรณ์ใหม่</h3>
-            <form action="/add" method="post" enctype="multipart/form-data" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <input name="name" placeholder="ชื่อของ" required>
-                <input name="unit" placeholder="หน่วย" required>
-                <input type="file" name="file" accept="image/*">
-                <button type="submit" class="btn-add">บันทึก</button>
+        <div class="form-container">
+            <h3 style="margin-top:0; color:#28a745;">➕ เพิ่มรายการอุปกรณ์ใหม่ลงคลัง</h3>
+            <form action="/add" method="post" enctype="multipart/form-data">
+                <div class="form-grid">
+                    <div>
+                        <label>ชื่ออุปกรณ์:</label><br>
+                        <input name="name" placeholder="ระบุชื่อสิ่งของ" required style="width:100%">
+                    </div>
+                    <div>
+                        <label>หน่วยนับ:</label><br>
+                        <input name="unit" placeholder="เช่น ชิ้น, ตัว, กล่อง" required style="width:100%">
+                    </div>
+                    <div>
+                        <label>รูปภาพ (ถ้ามี):</label><br>
+                        <input type="file" name="file" accept="image/*" style="width:100%">
+                    </div>
+                </div>
+                <button type="submit" class="btn-save">✅ บันทึกอุปกรณ์ใหม่เข้าสู่ระบบ</button>
+            </form>
+        </div>
+
+        <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+            <form method="get" style="display: flex; gap: 10px; flex-grow: 1;">
+                <input name="search" placeholder="พิมพ์ชื่อเพื่อค้นหาของในคลัง..." value="{{ search }}" style="flex-grow: 1;">
+                <button type="submit" class="btn-search">🔍 ค้นหา</button>
             </form>
         </div>
 
         <table>
-            <tr><th>รูป</th><th>ชื่ออุปกรณ์</th><th>คงเหลือ</th><th>จัดการ</th></tr>
+            <tr>
+                <th>รูป</th>
+                <th>รายละเอียดอุปกรณ์</th>
+                <th>คงเหลือ</th>
+                <th style="width: 300px;">จัดการ (รับเข้า/เบิกออก)</th>
+            </tr>
             {% for item in items %}
             <tr>
                 <td style="text-align:center;">
-                    {% if item.image_path %}<img src="{{ item.image_path }}" width="60" height="60" style="object-fit: cover;">{% else %} - {% endif %}
+                    {% if item.image_path %}
+                        <img src="{{ item.image_path }}" width="65" height="65" style="object-fit: cover; border-radius: 5px; border: 1px solid #ddd;">
+                    {% else %}
+                        <span style="color:#ccc; font-size: 12px;">ไม่มีรูป</span>
+                    {% endif %}
                 </td>
-                <td><strong>{{ item.name }}</strong></td>
-                <td style="text-align: center;">{{ item.balance }} {{ item.unit }}</td>
                 <td>
-                    <form action="/update" method="post" style="display: flex; gap: 5px;">
+                    <strong>{{ item.name }}</strong><br>
+                    <small style="color:#666;">หน่วย: {{ item.unit }}</small>
+                </td>
+                <td style="font-size: 1.3em; color: #007bff;">{{ item.balance }}</td>
+                <td>
+                    <form action="/update" method="post" style="display: flex; flex-direction: column; gap: 5px;">
                         <input type="hidden" name="id" value="{{ item.id }}">
-                        <input name="user_name" placeholder="ชื่อคนทำ" required style="width:100px;">
-                        <input type="number" name="amount" style="width:50px;" required min="1">
-                        <button name="type" value="IN" style="background:#28a745; color:white; border:none; padding:5px; border-radius:4px;">รับ</button>
-                        <button name="type" value="OUT" style="background:#dc3545; color:white; border:none; padding:5px; border-radius:4px;">เบิก</button>
+                        <input name="user_name" placeholder="ชื่อผู้ทำรายการ" required>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="number" name="amount" placeholder="จำนวน" required min="1" style="flex-grow: 1;">
+                            <button name="type" value="IN" style="background:#28a745; color:white; border:none; padding: 8px 15px; border-radius: 5px; cursor:pointer;">รับ</button>
+                            <button name="type" value="OUT" style="background:#dc3545; color:white; border:none; padding: 8px 15px; border-radius: 5px; cursor:pointer;">เบิก</button>
+                        </div>
                     </form>
                 </td>
             </tr>
@@ -95,22 +129,17 @@ def index():
         </table>
     ''', items=items, search=search)
 
-# --- หน้าประวัติ: เพิ่มระบบกรอง (Filter) ---
+# --- หน้าประวัติ: ดูย้อนหลัง + กรองข้อมูล ---
 @app.route('/history')
 def history():
     filter_type = request.args.get('type', '')
     search = request.args.get('search', '')
-    
     query = "SELECT * FROM history WHERE 1=1"
     params = []
-    
     if filter_type:
-        query += " AND type = ?"
-        params.append(filter_type)
+        query += " AND type = ?"; params.append(filter_type)
     if search:
-        query += " AND item_name LIKE ?"
-        params.append('%'+search+'%')
-        
+        query += " AND item_name LIKE ?"; params.append('%'+search+'%')
     query += " ORDER BY timestamp DESC"
     
     conn = get_db_connection()
@@ -119,41 +148,41 @@ def history():
     
     return render_template_string('''
         <style>
-            body { font-family: sans-serif; max-width: 900px; margin: auto; padding: 20px; background: #f4f7f6; }
-            .nav { margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; display: flex; gap: 20px; }
+            body { font-family: sans-serif; max-width: 1000px; margin: auto; padding: 20px; background: #f0f2f5; }
+            .nav { margin-bottom: 20px; padding: 15px; background: white; border-radius: 10px; display: flex; gap: 20px; font-weight: bold; }
             table { width: 100%; border-collapse: collapse; background: white; }
-            th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-            .filter-box { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-            .btn-ex { padding: 8px 12px; border-radius: 4px; color: white; text-decoration: none; font-size: 13px; }
+            th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+            .filter-bar { background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         </style>
         <div class="nav"><a href="/">🏠 กลับหน้าหลัก</a></div>
-        <h1>📜 ประวัติการเบิก-รับของ</h1>
+        <h1>📜 ประวัติการเคลื่อนไหวอุปกรณ์</h1>
         
-        <form method="get" class="filter-box">
-            <input name="search" placeholder="ค้นชื่อของ..." value="{{ search }}">
+        <form method="get" class="filter-bar">
+            <strong>กรองข้อมูล:</strong>
+            <input name="search" placeholder="ค้นหาชื่อของ..." value="{{ search }}">
             <select name="type">
-                <option value="">-- ทั้งหมด --</option>
-                <option value="IN" {% if filter_type == 'IN' %}selected{% endif %}>✅ เฉพาะรับเข้า</option>
-                <option value="OUT" {% if filter_type == 'OUT' %}selected{% endif %}>📤 เฉพาะเบิกออก</option>
+                <option value="">-- ทุกประเภท --</option>
+                <option value="IN" {% if filter_type == 'IN' %}selected{% endif %}>รับเข้า</option>
+                <option value="OUT" {% if filter_type == 'OUT' %}selected{% endif %}>เบิกออก</option>
             </select>
-            <button type="submit">🔎 กรองข้อมูล</button>
-            <a href="/history" style="font-size: 12px;">ล้างค่า</a>
+            <button type="submit">กรอง</button>
+            <a href="/history" style="font-size: 12px; color: #666;">ล้างค่า</a>
             
-            <div style="margin-left: auto; display: flex; gap: 5px;">
-                <a href="/export/excel" class="btn-ex" style="background: #1d6f42;">Excel</a>
-                <a href="/export/pdf" class="btn-ex" style="background: #c1311b;">PDF</a>
+            <div style="margin-left: auto;">
+                <a href="/export/excel" style="background: #1d6f42; color:white; padding: 8px 12px; text-decoration: none; border-radius: 5px;">Excel</a>
+                <a href="/export/pdf" style="background: #c1311b; color:white; padding: 8px 12px; text-decoration: none; border-radius: 5px;">PDF</a>
             </div>
         </form>
 
         <table>
-            <tr><th>วัน-เวลา</th><th>ชื่ออุปกรณ์</th><th>จำนวน</th><th>ประเภท</th><th>ผู้ทำรายการ</th></tr>
+            <tr><th>วัน-เวลา</th><th>ชื่ออุปกรณ์</th><th>จำนวน</th><th>สถานะ</th><th>ผู้ทำรายการ</th></tr>
             {% for log in logs %}
             <tr>
-                <td style="font-size: 0.8em; color: #666;">{{ log.timestamp }}</td>
-                <td>{{ log.item_name }}</td>
+                <td style="color:#666; font-size: 0.9em;">{{ log.timestamp }}</td>
+                <td><strong>{{ log.item_name }}</strong></td>
                 <td>{{ log.amount }}</td>
                 <td style="color: {{ 'green' if log.type == 'IN' else 'red' }}; font-weight: bold;">
-                    {{ "รับเข้า" if log.type == "IN" else "เบิกออก" }}
+                    {{ "✅ รับเข้า" if log.type == "IN" else "📤 เบิกออก" }}
                 </td>
                 <td>{{ log.user_name }}</td>
             </tr>
@@ -171,7 +200,7 @@ def export_excel():
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
     output.seek(0)
-    return send_file(output, download_name="history.xlsx", as_attachment=True)
+    return send_file(output, download_name="inventory_history.xlsx", as_attachment=True)
 
 @app.route('/export/pdf')
 def export_pdf():
@@ -180,16 +209,16 @@ def export_pdf():
     conn.close()
     buffer = BytesIO()
     p = canvas.Canvas(buffer)
-    p.drawString(100, 800, "Inventory Report")
+    p.drawString(100, 800, "Inventory Transaction Report")
     y = 770
     for log in logs:
         p.drawString(100, y, f"{log['timestamp']} | {log['item_name']} | {log['amount']} | {log['type']} | {log['user_name']}")
         y -= 20
         if y < 50: p.showPage(); y = 800
     p.showPage(); p.save(); buffer.seek(0)
-    return send_file(buffer, download_name="history.pdf", as_attachment=True)
+    return send_file(buffer, download_name="inventory_report.pdf", as_attachment=True)
 
-# --- ส่วนจัดการข้อมูล ---
+# --- จัดการข้อมูล ---
 @app.route('/add', methods=['POST'])
 def add():
     file = request.files.get('file')
