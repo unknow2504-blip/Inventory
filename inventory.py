@@ -17,10 +17,7 @@ def get_db():
 def index():
     search = request.args.get('search', '')
     conn = get_db()
-    if search:
-        items = conn.execute("SELECT * FROM items WHERE name LIKE ?", ('%'+search+'%',)).fetchall()
-    else:
-        items = conn.execute('SELECT * FROM items').fetchall()
+    items = conn.execute("SELECT * FROM items WHERE name LIKE ?", ('%'+search+'%',)).fetchall() if search else conn.execute('SELECT * FROM items').fetchall()
     conn.close()
     return render_template_string(HTML_MAIN, items=items, search=search)
 
@@ -31,7 +28,6 @@ def history():
     conn.close()
     return render_template_string(HTML_HISTORY, logs=logs)
 
-# --- ปุ่มส่งออกไฟล์ ---
 @app.route('/export/excel')
 def export_excel():
     conn = get_db()
@@ -43,22 +39,6 @@ def export_excel():
     output.seek(0)
     return send_file(output, download_name="history.xlsx", as_attachment=True)
 
-@app.route('/export/pdf')
-def export_pdf():
-    conn = get_db()
-    logs = conn.execute('SELECT * FROM history ORDER BY timestamp DESC').fetchall()
-    conn.close()
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer)
-    p.drawString(100, 800, "Inventory Report")
-    y = 770
-    for log in logs:
-        p.drawString(100, y, f"{log['timestamp']} | {log['item_name']} | {log['amount']} | {log['type']} | {log['user_name']}")
-        y -= 20
-    p.save(); buffer.seek(0)
-    return send_file(buffer, download_name="report.pdf", as_attachment=True)
-
-# --- ระบบจัดการข้อมูล ---
 @app.route('/add', methods=['POST'])
 def add():
     file = request.files.get('file')
@@ -79,7 +59,7 @@ def update():
     if item:
         new_bal = item['balance'] + amt if t_type == 'IN' else item['balance'] - amt
         conn.execute('UPDATE items SET balance=? WHERE id=?', (max(0, new_bal), id))
-        conn.execute('INSERT INTO history (item_name, amount, type, user_name) VALUES (?, ?, ?, ?)', (item['name'], amt, t_type, user))
+        conn.execute('INSERT INTO history (item_name, amount, type, user_name) VALUES (?, ?, ? , ?)', (item['name'], amt, t_type, user))
         conn.commit(); conn.close()
     return redirect('/')
 
@@ -90,38 +70,31 @@ HTML_MAIN = '''
     <meta charset="UTF-8">
     <style>
         body { font-family: sans-serif; background: #f4f7f6; padding: 20px; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; border-top: 5px solid #28a745; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background: #007bff; color: white; }
     </style>
 </head>
 <body>
     <div style="max-width: 900px; margin: auto;">
-        <div style="display:flex; justify-content: space-between; align-items: center;">
-            <h2>📦 ระบบคลังสินค้า</h2>
-            <a href="/history">📜 ดูประวัติการเบิก-รับ</a>
-        </div>
-        
-        <div class="card" style="border-top: 5px solid #28a745;">
+        <h2>📦 ระบบคลังสินค้า</h2>
+        <div class="card">
             <h3>➕ เพิ่มอุปกรณ์ใหม่</h3>
             <form action="/add" method="post" enctype="multipart/form-data" style="display: flex; gap: 10px;">
                 <input name="name" placeholder="ชื่อของ" required style="flex:2; padding:8px;">
                 <input name="unit" placeholder="หน่วย" required style="flex:1; padding:8px;">
-                <input type="file" name="file" style="flex:1;">
-                <button type="submit" style="background:#28a745; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer;">บันทึก</button>
+                <input type="file" name="file">
+                <button type="submit" style="background:#28a745; color:white; border:none; padding:10px; border-radius:4px;">บันทึก</button>
             </form>
         </div>
-
         <div class="card">
-            <form method="get" style="margin-bottom:15px;"><input name="search" placeholder="ค้นหาชื่ออุปกรณ์..." value="{{ search }}" style="padding:8px; width:200px;"> <button type="submit">🔍 ค้นหา</button></form>
+            <a href="/history">📜 ดูประวัติการเบิก-รับ</a>
             <table>
-                <tr><th>รูป</th><th>ชื่ออุปกรณ์</th><th>คงเหลือ</th><th>จัดการ</th></tr>
+                <tr style="background:#007bff; color:white;"><th>ชื่อ</th><th>คงเหลือ</th><th>จัดการ</th></tr>
                 {% for item in items %}
                 <tr>
-                    <td>{% if item.image_path %}<img src="{{ item.image_path }}" width="50">{% else %}-{% endif %}</td>
                     <td>{{ item.name }} ({{ item.unit }})</td>
-                    <td style="font-weight:bold; color:#007bff;">{{ item.balance }}</td>
+                    <td>{{ item.balance }}</td>
                     <td>
                         <form action="/update" method="post" style="display:flex; gap:5px;">
                             <input type="hidden" name="id" value="{{ item.id }}">
@@ -147,14 +120,11 @@ HTML_HISTORY = '''
 <body>
     <a href="/">⬅ กลับหน้าหลัก</a>
     <h2>📜 ประวัติการเบิก-รับ</h2>
-    <div style="margin-bottom:15px;">
-        <a href="/export/excel" style="background:#1d6f42; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">Excel</a>
-        <a href="/export/pdf" style="background:#c1311b; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">PDF</a>
-    </div>
-    <table>
+    <a href="/export/excel" style="background:#1d6f42; color:white; padding:10px; text-decoration:none; border-radius:4px;">📥 Export Excel</a>
+    <table style="margin-top:20px;">
         <tr style="background:#eee;"><th>วัน-เวลา</th><th>ชื่อของ</th><th>จำนวน</th><th>ประเภท</th><th>คนทำ</th></tr>
         {% for log in logs %}
-        <tr><td>{{ log.timestamp }}</td><td>{{ log.item_name }}</td><td>{{ log.amount }}</td><td>{{ "รับเข้า" if log.type == "IN" else "เบิกออก" }}</td><td>{{ log.user_name }}</td></tr>
+        <tr><td>{{ log.timestamp }}</td><td>{{ log.item_name }}</td><td>{{ log.amount }}</td><td>{{ "รับ" if log.type=="IN" else "เบิก" }}</td><td>{{ log.user_name }}</td></tr>
         {% endfor %}
     </table>
 </body>
