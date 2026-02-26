@@ -12,16 +12,18 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-# หน้าหลัก: เน้นดูของและเบิกจ่าย
+# --- หน้าแรก: รวมฟอร์มเพิ่มของและตารางเบิกจ่าย ---
 @app.route('/')
 def index():
     search = request.args.get('search', '')
     conn = get_db()
-    items = conn.execute("SELECT * FROM items WHERE name LIKE ?", ('%'+search+'%',)).fetchall() if search else conn.execute("SELECT * SELECT * FROM items").fetchall()
+    if search:
+        items = conn.execute("SELECT * FROM items WHERE name LIKE ?", ('%'+search+'%',)).fetchall()
+    else:
+        items = conn.execute("SELECT * FROM items").fetchall() # แก้ไขจุดที่พิมพ์ซ้ำแล้ว
     conn.close()
     return render_template_string(HTML_MAIN, items=items, search=search)
 
-# หน้าประวัติ: แยกออกมาต่างหาก ไม่ให้ปนกัน
 @app.route('/history')
 def history():
     conn = get_db()
@@ -29,7 +31,6 @@ def history():
     conn.close()
     return render_template_string(HTML_HISTORY, logs=logs)
 
-# --- ส่วนรับข้อมูล (Add/Update) ---
 @app.route('/add', methods=['POST'])
 def add():
     file = request.files.get('file')
@@ -53,113 +54,60 @@ def update():
     conn.commit()
     return redirect('/')
 
-# --- ดีไซน์หน้าเว็บ (แยกเก็บเป็นตัวแปรจะได้ไม่เละ) ---
+# --- ดีไซน์หน้าเว็บแบบเป็นระเบียบ ---
 HTML_MAIN = '''
 <!DOCTYPE html>
-<html lang="th">
+<html>
 <head>
+    <meta charset="UTF-8">
     <style>
-        <style>
-    .card-add-item {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
-        border-top: 5px solid #28a745; /* แถบสีเขียวด้านบนให้ดูเด่น */
-    }
-    .form-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 15px;
-        margin-bottom: 15px;
-    }
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-        color: #333;
-    }
-    .form-group input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        box-sizing: border-box; /* ป้องกัน input ล้นขอบ */
-    }
-    .btn-submit {
-        background: #28a745;
-        color: white;
-        padding: 12px 20px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: bold;
-        width: 100%;
-        transition: background 0.3s;
-    }
-    .btn-submit:hover {
-        background: #218838;
-    }
-</style>
-
-<div class="card-add-item">
-    <h3 style="margin-top: 0; color: #28a745;">➕ ลงทะเบียนอุปกรณ์ใหม่</h3>
-    <form action="/add" method="post" enctype="multipart/form-data">
-        <div class="form-grid">
-            <div class="form-group">
-                <label>ชื่ออุปกรณ์/พัสดุ:</label>
-                <input type="text" name="name" placeholder="เช่น กระดาษ A4, ปากกา" required>
-            </div>
-            <div class="form-group">
-                <label>หน่วยนับ:</label>
-                <input type="text" name="unit" placeholder="เช่น รีม, ด้าม, กล่อง" required>
-            </div>
-            <div class="form-group">
-                <label>รูปภาพประกอบ:</label>
-                <input type="file" name="file" accept="image/*">
-            </div>
-        </div>
-        <button type="submit" class="btn-submit">💾 บันทึกข้อมูลลงฐานข้อมูล</button>
-    </form>
-</div>
-
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 900px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: #007bff; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div style="display:flex; justify-content: space-between;">
-            <h2>📦 ระบบคลังพัสดุ</h2>
-            <a href="/history">📜 ดูประวัติการเบิก</a>
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+            <h2 style="color: #007bff;">📦 ระบบคลังพัสดุ</h2>
+            <a href="/history" style="text-decoration: none; color: #666;">📜 ดูประวัติย้อนหลัง</a>
         </div>
 
-        <div class="card">
-            <h4>➕ เพิ่มของใหม่</h4>
-            <form action="/add" method="post" enctype="multipart/form-data" style="display:flex; gap:10px;">
-                <input name="name" placeholder="ชื่อของ" required style="flex:2;">
-                <input name="unit" placeholder="หน่วย" required style="flex:1;">
-                <input type="file" name="file" style="flex:1;">
+        <div class="card" style="border-top: 4px solid #28a745;">
+            <h3 style="margin-top:0; color:#28a745;">➕ ลงทะเบียนของใหม่</h3>
+            <form action="/add" method="post" enctype="multipart/form-data" style="display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:10px; align-items: end;">
+                <div><label>ชื่อของ:</label><br><input name="name" required style="width:100%; padding:8px;"></div>
+                <div><label>หน่วย:</label><br><input name="unit" required style="width:100%; padding:8px;"></div>
+                <div><label>รูป:</label><br><input type="file" name="file" style="width:100%;"></div>
                 <button type="submit" class="btn" style="background:#28a745;">บันทึก</button>
             </form>
         </div>
 
         <div class="card">
-            <form method="get"><input name="search" placeholder="ค้นหาชื่อของ..." style="width:70%; padding:8px;"> <button type="submit" class="btn" style="background:#6c757d;">ค้นหา</button></form>
+            <form method="get" style="display:flex; gap:10px; margin-bottom:15px;">
+                <input name="search" placeholder="พิมพ์ชื่อเพื่อค้นหา..." value="{{ search }}" style="flex:1; padding:8px;">
+                <button type="submit" class="btn" style="background:#007bff;">🔍 ค้นหา</button>
+            </form>
             <table>
-                <tr><th>รูป</th><th>ชื่อ</th><th>คงเหลือ</th><th>จัดการ</th></tr>
+                <tr><th>รูป</th><th>ชื่อ (หน่วย)</th><th>คงเหลือ</th><th>จัดการเบิก/รับ</th></tr>
                 {% for item in items %}
                 <tr>
-                    <td>{% if item.image_path %}<img src="{{ item.image_path }}" width="50">{% endif %}</td>
-                    <td>{{ item.name }} ({{ item.unit }})</td>
-                    <td style="font-weight:bold; color:#007bff;">{{ item.balance }}</td>
+                    <td>{% if item.image_path %}<img src="{{ item.image_path }}" width="50" height="50" style="object-fit:cover; border-radius:5px;">{% else %}-{% endif %}</td>
+                    <td><strong>{{ item.name }}</strong><br><small>{{ item.unit }}</small></td>
+                    <td style="font-size:1.2em; color:#007bff;">{{ item.balance }}</td>
                     <td>
-                        <form action="/update" method="post" style="display:flex; gap:5px;">
+                        <form action="/update" method="post" style="display:flex; flex-direction:column; gap:5px;">
                             <input type="hidden" name="id" value="{{ item.id }}">
-                            <input name="user" placeholder="คนเบิก" required style="width:80px;">
-                            <input type="number" name="amount" value="1" style="width:40px;">
-                            <button name="type" value="IN" class="btn" style="background:#007bff;">รับ</button>
-                            <button name="type" value="OUT" class="btn" style="background:#dc3545;">เบิก</button>
+                            <input name="user" placeholder="ชื่อคนเบิก" required style="padding:5px;">
+                            <div style="display:flex; gap:5px;">
+                                <input type="number" name="amount" value="1" min="1" style="width:50px; padding:5px;">
+                                <button name="type" value="IN" class="btn" style="background:#007bff; flex:1; padding:5px;">รับ</button>
+                                <button name="type" value="OUT" class="btn" style="background:#dc3545; flex:1; padding:5px;">เบิก</button>
+                            </div>
                         </form>
                     </td>
                 </tr>
@@ -174,30 +122,8 @@ HTML_MAIN = '''
 HTML_HISTORY = '''
 <!DOCTYPE html>
 <html>
-<head><style>body{font-family:sans-serif; padding:20px; max-width:800px; margin:auto;} table{width:100%; border-collapse:collapse;} th,td{padding:10px; border:1px solid #ddd;}</style></head>
+<head><meta charset="UTF-8"><style>body{font-family:sans-serif; padding:20px; max-width:800px; margin:auto; background:#f8f9fa;} table{width:100%; border-collapse:collapse; background:white;} th,td{padding:10px; border:1px solid #ddd;}</style></head>
 <body>
-    <a href="/">⬅ กลับหน้าหลัก</a>
-    <h2>📜 ประวัติย้อนหลัง</h2>
-    <table>
-        <tr><th>วัน-เวลา</th><th>ชื่อของ</th><th>จำนวน</th><th>ประเภท</th><th>คนทำ</th></tr>
-        {% for log in logs %}
-        <tr>
-            <td>{{ log.timestamp }}</td>
-            <td>{{ log.item_name }}</td>
-            <td>{{ log.amount }}</td>
-            <td style="color:{{ 'green' if log.type=='IN' else 'red' }}">{{ 'รับเข้า' if log.type=='IN' else 'เบิกออก' }}</td>
-            <td>{{ log.user_name }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-</body>
-</html>
-'''
+    <div style="display:flex; justify-content: space-between;">
+        <a href="/" style="text-decoration:none;">
 
-if __name__ == '__main__':
-    # สร้างตารางถ้ายังไม่มี
-    conn = get_db()
-    conn.execute("CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, unit TEXT, balance INTEGER DEFAULT 0, image_path TEXT)")
-    conn.execute("CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, item_name TEXT, amount INTEGER, type TEXT, user_name TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
-    conn.close()
-    app.run()
