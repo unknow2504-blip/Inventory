@@ -1,95 +1,146 @@
-from flask import Flask, render_template_string, request, redirect
+from flask import Flask, render_template_string, request, redirect, send_file
 import sqlite3
+import pandas as pd
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 app = Flask(__name__)
 
-# --- ส่วนจัดการ Database ---
 def get_db_connection():
-    conn = sqlite3.connect('office_supplies.db')
+    conn = sqlite3.connect('inventory.db')
     conn.row_factory = sqlite3.Row
     return conn
 
+# อัปเกรดฐานข้อมูล: เพิ่มช่อง image_url และตารางประวัติ
 def init_db():
     conn = get_db_connection()
-    conn.execute('''CREATE TABLE IF NOT EXISTS items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL, unit TEXT NOT NULL, balance INTEGER DEFAULT 0)''')
-    conn.commit()
+    conn.execute('''CREATE TABLE IF NOT EXISTS items 
+        (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, unit TEXT, balance INTEGER DEFAULT 0, image_url TEXT)''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS history 
+        (id INTEGER PRIMARY KEY AUTOINCREMENT, item_name TEXT, amount INTEGER, type TEXT, user_name TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
     conn.close()
 
 init_db()
 
-# --- หน้าเว็บหลัก ---
 @app.route('/')
 def index():
+    search = request.args.get('search', '')
     conn = get_db_connection()
-    items = conn.execute('SELECT * FROM items').fetchall()
+    if search:
+        items = conn.execute("SELECT * FROM items WHERE name LIKE ?", ('%'+search+'%',)).fetchall()
+    else:
+        items = conn.execute('SELECT * FROM items').fetchall()
     conn.close()
+    
     return render_template_string('''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>ระบบจัดการคลัง</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-            table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-            th { background: #007bff; color: white; }
-            .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-            input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-            button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <h2>📦 เพิ่มอุปกรณ์ใหม่</h2>
+        <h1>📦 ระบบจัดการคลัง Pro</h1>
+        
+        <form method="get" style="margin-bottom: 20px;">
+            <input name="search" placeholder="ค้นหาชื่ออุปกรณ์..." value="{{ search }}">
+            <button type="submit">🔍 ค้นหา</button>
+            <a href="/">ล้างการค้นหา</a>
+        </form>
+
+        <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 20px;">
+            <h3>➕ เพิ่มอุปกรณ์ใหม่</h3>
             <form action="/add" method="post">
-                <input type="text" name="name" placeholder="ชื่ออุปกรณ์" required>
-                <input type="text" name="unit" placeholder="หน่วย (เช่น ชิ้น, กล่อง)" required>
-                <button type="submit">เพิ่มเข้าระบบ</button>
+                <input name="name" placeholder="ชื่อของ" required>
+                <input name="unit" placeholder="หน่วย" required>
+                <input name="image_url" placeholder="ลิงก์รูปภาพ (URL)">
+                <button type="submit">บันทึก</button>
             </form>
         </div>
-        <table>
-            <tr><th>ID</th><th>ชื่อ</th><th>คงเหลือ</th><th>หน่วย</th><th>จัดการ</th></tr>
+
+        <div style="margin-bottom: 10px;">
+            <a href="/export/excel"><button style="background: green; color: white;">💾 โหลด Excel</button></a>
+            <a href="/export/pdf"><button style="background: red; color: white;">📄 โหลด PDF</button></a>
+        </div>
+
+        <table border="1" style="width:100%; text-align:left;">
+            <tr>
+                <th>รูปภาพ</th><th>ชื่อ</th><th>คงเหลือ</th><th>หน่วย</th><th>จัดการ (ระบุชื่อผู้เบิกด้วย)</th>
+            </tr>
             {% for item in items %}
             <tr>
-                <td>{{ item['id'] }}</td>
-                <td>{{ item['name'] }}</td>
-                <td><strong>{{ item['balance'] }}</strong></td>
-                <td>{{ item['unit'] }}</td>
                 <td>
-                    <form action="/update" method="post" style="display:flex; gap:5px;">
-                        <input type="hidden" name="id" value="{{ item['id'] }}">
-                        <input type="number" name="amount" style="width:60px" placeholder="จำนวน" required>
-                        <button type="submit" name="type" value="IN" style="background:#007bff">รับ</button>
-                        <button type="submit" name="type" value="OUT" style="background:#dc3545">เบิก</button>
+                    {% if item.image_url %}
+                        <img src="{{ item.image_url }}" width="50" height="50" style="object-fit: cover;">
+                    {% else %}
+                        ไม่มีรูป
+                    {% endif %}
+                </td>
+                <td>{{ item.name }}</td>
+                <td><strong>{{ item.balance }}</strong></td>
+                <td>{{ item.unit }}</td>
+                <td>
+                    <form action="/update" method="post">
+                        <input type="hidden" name="id" value="{{ item.id }}">
+                        <input name="user_name" placeholder="ชื่อคนเบิก/รับ" required style="width:100px">
+                        <input type="number" name="amount" style="width:50px" required min="1">
+                        <button name="type" value="IN">รับเข้า</button>
+                        <button name="type" value="OUT">เบิกออก</button>
                     </form>
                 </td>
             </tr>
             {% endfor %}
         </table>
-    </body>
-    </html>
-    ''', items=items)
+    ''', items=items, search=search)
 
+# --- ส่วน Export ข้อมูล ---
+@app.route('/export/excel')
+def export_excel():
+    conn = get_db_connection()
+    df = pd.read_sql_query("SELECT * FROM items", conn)
+    conn.close()
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Inventory')
+    output.seek(0)
+    return send_file(output, download_name="inventory.xlsx", as_attachment=True)
+
+@app.route('/export/pdf')
+def export_pdf():
+    conn = get_db_connection()
+    items = conn.execute('SELECT * FROM items').fetchall()
+    conn.close()
+    
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer)
+    p.drawString(100, 800, "Inventory Report")
+    y = 750
+    for item in items:
+        p.drawString(100, y, f"ID: {item['id']} | {item['name']} : {item['balance']} {item['unit']}")
+        y -= 20
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return send_file(buffer, download_name="inventory.pdf", as_attachment=True)
+
+# --- ส่วนจัดการ Data (Add/Update) ---
 @app.route('/add', methods=['POST'])
 def add():
-    name, unit = request.form['name'], request.form['unit']
     conn = get_db_connection()
-    conn.execute('INSERT INTO items (name, unit) VALUES (?, ?)', (name, unit))
+    conn.execute('INSERT INTO items (name, unit, image_url) VALUES (?, ?, ?)', 
+                 (request.form['name'], request.form['unit'], request.form['image_url']))
     conn.commit()
     conn.close()
     return redirect('/')
 
 @app.route('/update', methods=['POST'])
 def update():
-    item_id, amount, t_type = request.form['id'], int(request.form['amount']), request.form['type']
+    item_id = request.form['id']
+    amount = int(request.form['amount'])
+    t_type = request.form['type']
+    user = request.form['user_name']
+    
     conn = get_db_connection()
-    item = conn.execute('SELECT balance FROM items WHERE id = ?', (item_id,)).fetchone()
+    item = conn.execute('SELECT * FROM items WHERE id = ?', (item_id,)).fetchone()
     if item:
         new_bal = item['balance'] + amount if t_type == 'IN' else item['balance'] - amount
         conn.execute('UPDATE items SET balance = ? WHERE id = ?', (max(0, new_bal), item_id))
+        # บันทึกลงประวัติ
+        conn.execute('INSERT INTO history (item_name, amount, type, user_name) VALUES (?, ?, ?, ?)',
+                     (item['name'], amount, t_type, user))
         conn.commit()
     conn.close()
     return redirect('/')
