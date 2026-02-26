@@ -59,13 +59,72 @@ HTML_MAIN = '''
 <html lang="th">
 <head>
     <style>
-        body { font-family: sans-serif; background: #f8f9fa; padding: 20px; }
-        .container { max-width: 900px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background: #007bff; color: white; }
-        .btn { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; color: white; }
+        <style>
+    .card-add-item {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+        border-top: 5px solid #28a745; /* แถบสีเขียวด้านบนให้ดูเด่น */
+    }
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-sizing: border-box; /* ป้องกัน input ล้นขอบ */
+    }
+    .btn-submit {
+        background: #28a745;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        width: 100%;
+        transition: background 0.3s;
+    }
+    .btn-submit:hover {
+        background: #218838;
+    }
+</style>
+
+<div class="card-add-item">
+    <h3 style="margin-top: 0; color: #28a745;">➕ ลงทะเบียนอุปกรณ์ใหม่</h3>
+    <form action="/add" method="post" enctype="multipart/form-data">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>ชื่ออุปกรณ์/พัสดุ:</label>
+                <input type="text" name="name" placeholder="เช่น กระดาษ A4, ปากกา" required>
+            </div>
+            <div class="form-group">
+                <label>หน่วยนับ:</label>
+                <input type="text" name="unit" placeholder="เช่น รีม, ด้าม, กล่อง" required>
+            </div>
+            <div class="form-group">
+                <label>รูปภาพประกอบ:</label>
+                <input type="file" name="file" accept="image/*">
+            </div>
+        </div>
+        <button type="submit" class="btn-submit">💾 บันทึกข้อมูลลงฐานข้อมูล</button>
+    </form>
+</div>
+
     </style>
 </head>
 <body>
