@@ -157,6 +157,67 @@ def update():
         conn.commit()
     conn.close()
     return redirect('/')
+@app.route('/export/excel')
+def export_excel():
+    conn = get_db_connection()
+    # ดึงข้อมูลจากตาราง history
+    df = pd.read_sql_query("SELECT timestamp, item_name, amount, type, user_name FROM history ORDER BY timestamp DESC", conn)
+    conn.close()
+    
+    # แปลงประเภทให้เป็นภาษาไทยเพื่อให้อ่านง่ายใน Excel
+    df['type'] = df['type'].apply(lambda x: 'รับเข้า' if x == 'IN' else 'เบิกออก')
+    
+    output = BytesIO()
+    # ใช้ xlsxwriter เป็น engine
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Inventory_History')
+    output.seek(0)
+    
+    return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+                     as_attachment=True, download_name="history_report.xlsx")
+
+@app.route('/export/pdf')
+def export_pdf():
+    conn = get_db_connection()
+    logs = conn.execute('SELECT * FROM history ORDER BY timestamp DESC').fetchall()
+    conn.close()
+
+    output = BytesIO()
+    p = canvas.Canvas(output, pagesize=A4)
+    width, height = A4
+
+    # เขียนหัวข้อ PDF
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(100, height - 50, "Inventory Transaction Report")
+    
+    p.setFont("Helvetica", 10)
+    y = height - 80
+    p.drawString(50, y, "Timestamp")
+    p.drawString(180, y, "Item Name")
+    p.drawString(300, y, "Amount")
+    p.drawString(380, y, "Type")
+    p.drawString(450, y, "User")
+    p.line(50, y-5, 550, y-5)
+
+    y -= 25
+    for log in logs:
+        if y < 50: # ขึ้นหน้าใหม่ถ้าพื้นที่หมด
+            p.showPage()
+            y = height - 50
+        
+        p.drawString(50, y, str(log['timestamp']))
+        p.drawString(180, y, str(log['item_name']))
+        p.drawString(300, y, str(log['amount']))
+        p.drawString(380, y, str(log['type']))
+        p.drawString(450, y, str(log['user_name']))
+        y -= 20
+
+    p.showPage()
+    p.save()
+    output.seek(0)
+    
+    return send_file(output, mimetype='application/pdf', 
+                     as_attachment=True, download_name="history_report.pdf")
 
 if __name__ == '__main__':
     app.run()
